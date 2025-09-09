@@ -5,7 +5,7 @@ module ElectricEye
     include Starman::Configurable
 
     attr_reader :collection, :indexes
-    attr_accessor :index, :source, :target, :assocs, :domain, :hooks
+    attr_accessor :index, :source, :target, :assocs, :domain, :hooks, :delete_if
 
     key_attr :id
     key_attr :fields
@@ -20,35 +20,30 @@ module ElectricEye
     base_service true
     list_attr :index
 
-    def initialize(index)
-      @collection = self.class.service
+    def initialize(params)
+      @assocs = params[:assocs]
+      @index = params[:index_name]
+      @domain = params[:domain]
+      instance_exec(&params[:conf])
     end
 
-    def call(data)
-      indexes.each do |index|
-        index.call(collection, data)
-      end
+    def index_change(data)
+      @target = send(data[:action], data[:document])
+      delete?
     end
 
+    def delete?
+      return unless conf.delete_if
+      instance_exec
 
-  def initialize(params)
-    @assocs = params[:assocs]
-    @index = params[:index]
-    @domain = params[:domain]
-  end
+    def reindex(index_name)
+    end
 
-  def call(data)
-    send(data[:action], data[:document])
-  end
-
-  def add_index(ind)
-    indexes << ind
-  end
-
-  def initialize_actions
-    @actions = {}
-    @actions[:create] = ElectricEye::Action::Insert.new(conf)
-    @actions[:update] = ElectricEye::Action::Update.new(conf)
-    @actions[:delete] = ElectricEye::Action::Delete.new(conf)
+    def initialize_actions
+      @actions = {}
+      @actions[:create] = ElectricEye::Action::Insert.new(conf)
+      @actions[:update] = ElectricEye::Action::Update.new(conf)
+      @actions[:delete] = ElectricEye::Action::Delete.new(conf)
+    end
   end
 end

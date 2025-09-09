@@ -4,6 +4,10 @@ module ElectricEye
       def init_fields
 
       end
+
+      def call(data)
+        EsClient.index(index: self.index, body: document)
+      end
     end
   end
 end

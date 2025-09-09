@@ -1,27 +1,43 @@
 module ElectricEye
   class ChangeConsumerService < Starman::Service::Base
-    domain :default
+    custom_domain :default
 
-    attr_accessor :indexes
+    attr_accessor :collections
 
     def initialize
-      map_coll_to_index
+      init_collections
     end
 
     def call(data)
-      indexes[domain][name].index data
+      domain = data[:domain]
+      coll = data[:collection]
+      collections[domain][coll].each do |coll|
+        coll.index_change data
+      end
     end
 
     private
 
-    def map_coll_to_index
-       @indexes = {}
+    def init_collections
+       @collections = {}
        Index.subclasses.each do |ind|
          ind.conf.list[:collections].each do |src|
            name = src[:args].first
-           @indexes[ind.domain] ||= {})[name] = ind.new
+           # Multiple collections for multiple views (api / cms etc.)
+           (@collections[ind.coll_domain] ||= {})[name] ||= []) << 
+             init_single_coll(src, ind)
          end
        end
+    end
+
+    def init_single_coll(conf, index)
+      coll = Collection.new do
+        instance_exec(&conf[:body])
+      end
+      coll.domain = index.domain
+      coll.index_name = index.index_name
+      coll.delete_if = index.delete_if[:body]
+      coll
     end
   end
 end
